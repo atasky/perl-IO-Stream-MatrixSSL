@@ -3,10 +3,6 @@ use warnings;
 use strict;
 use t::share;
 
-if (CFG_ONLINE ne 'y') {
-    plan skip_all => 'online tests disabled';
-}
-
 IO::Stream->new({
 #    fh          => tcp_client('www.google.com', 443),
     host        => 'www.google.com',

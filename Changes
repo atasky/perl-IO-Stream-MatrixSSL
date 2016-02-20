@@ -1,14 +1,16 @@
 Revision history for IO-Stream-MatrixSSL
 
-1.1.2   Thu Oct  3 16:52:03 EEST 2013
-	Remove MYMETA.*
+{{$NEXT}}
+	- Switch to Dist::Milla.
 
-1.1.1	Sun May 13 06:01:33 EEST 2012
-	Fix requirements and tests.
+1.1.2   2013-10-03 16:52:03 EEST
+	- Remove MYMETA.*
 
-1.1.0	Sat Apr 04 19:11:42 EEST 2009
-	Added support for client certificates.
+1.1.1	2012-05-13 06:01:33 EEST
+	- Fix requirements and tests.
 
-1.0.0	Sun Nov 16 19:37:10 EET 2008
-	Initial release.
+1.1.0	2009-04-04 19:11:42 EEST
+	- Added support for client certificates.
 
+1.0.0	2008-11-16 19:37:10 EET
+	- Initial release.

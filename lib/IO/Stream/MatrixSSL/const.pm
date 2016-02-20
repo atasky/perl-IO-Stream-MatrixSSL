@@ -1,12 +1,11 @@
-## no critic (Capitalization)
 package IO::Stream::MatrixSSL::const;
-
+use 5.010001;
 use warnings;
 use strict;
+use utf8;
+use Carp;
 
-use version; our $VERSION = qv('1.0.0');
-
-# update DEPENDENCIES in POD & Makefile.PL & README
+our $VERSION = 'v1.1.2';
 
 # Timeouts:
 use constant TOHANDSHAKE    => 30;

@@ -1,12 +1,12 @@
 package IO::Stream::MatrixSSL::Server;
-
+use 5.010001;
 use warnings;
 use strict;
+use utf8;
 use Carp;
 
-use version; our $VERSION = qv('1.1.0');    # update POD & Changes & README
+our $VERSION = 'v1.1.2';
 
-# update DEPENDENCIES in POD & Makefile.PL & README
 use IO::Stream::const;
 use IO::Stream::MatrixSSL::const;
 use Crypt::MatrixSSL 1.83;
