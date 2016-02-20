@@ -228,11 +228,11 @@ This software is Copyright (c) 2008-2016 by Alex Efros &lt;powerman@cpan.org>.
 
 This is free software, licensed under:
 
-    The GNU Public License
+    The GNU General Public License version 2
 
 instead of less restrictive MIT only because…
 
-MatrixSSL is distributed under the GNU Public License…
+MatrixSSL is distributed under the GNU General Public License…
 
 Crypt::MatrixSSL uses MatrixSSL, and so inherits the same license…
 

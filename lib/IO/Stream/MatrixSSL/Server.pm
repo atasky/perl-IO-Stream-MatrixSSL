@@ -12,15 +12,15 @@ use IO::Stream::MatrixSSL::const;
 use Crypt::MatrixSSL 1.83;
 use Scalar::Util qw( weaken );
 
-use base qw( IO::Stream::MatrixSSL );
+use parent qw( -norequire IO::Stream::MatrixSSL );
 
 sub new {
     my ($class, $opt) = @_;
     croak '{crt} and {key} required'
         if !defined $opt->{crt} || !defined $opt->{key};
     my $self = bless {
-        crt         => undef,       # filename(s) with server certificate(s)
-        key         => undef,       # filename with server private key
+        crt         => undef,       # filename(s) with server's certificate(s)
+        key         => undef,       # filename with server's private key
         pass        => undef,       # password to decrypt private key
         trusted_CA  => undef,       # filename(s) with trusted root CA cert(s)
         cb          => undef,       # callback for validating certificate
@@ -40,8 +40,7 @@ sub new {
         _t          => undef,
         _cb_t       => undef,
         }, $class;
-    my $this = $self;
-    weaken($this);
+    weaken(my $this = $self);
     $self->{_cb_t} = sub { $this->T() };
     # Initialize SSL.
     # TODO OPTIMIZATION Cache {_ssl_keys}.
@@ -56,8 +55,7 @@ sub new {
         undef, $flags)
         == 0 or croak 'matrixSslNewSession';
     # Prepare first param for cb.
-    $self->{_param}[0] = $self;
-    weaken $self->{_param}[0];
+    weaken($self->{_param}[0] = $self);
     if (defined $self->{cb}) {
         matrixSslSetCertValidator($self->{_ssl}, $self->{cb}, $self->{_param});
     }
@@ -74,8 +72,7 @@ sub PREPARE {
     while ($io->{_master}) {
         $io = $io->{_master};
     }
-    $self->{_param}[1] = $io;
-    weaken $self->{_param}[1];
+    weaken($self->{_param}[1] = $io);
     $self->{_slave}->PREPARE($fh, $host, $port);
     return;
 }

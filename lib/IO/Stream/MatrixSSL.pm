@@ -1,4 +1,3 @@
-## no critic (Capitalization)
 package IO::Stream::MatrixSSL;
 use 5.010001;
 use warnings;
@@ -70,9 +69,9 @@ sub EVENT { ## no critic (ProhibitExcessComplexity)
     if ($e & IN) {
         $e &= ~IN;
         while (length $self->{in_buf}) {
-            my ($error, $alertLevel, $alertDescription);
+            my ($error, $alert_level, $alert_description);
             my $rc = matrixSslDecode($self->{_ssl}, $self->{in_buf},
-                my $buf=q{}, $error, $alertLevel, $alertDescription);
+                my $buf=q{}, $error, $alert_level, $alert_description);
             if ($rc == $SSL_PROCESS_DATA) {
                 $e |= IN;
                 $m->{in_buf}    .= $buf;
@@ -106,8 +105,8 @@ sub EVENT { ## no critic (ProhibitExcessComplexity)
                     last;
                 }
                 elsif ($rc == $SSL_ALERT) {
-                    if ($alertLevel == $SSL_ALERT_LEVEL_WARNING
-                            && $alertDescription == $SSL_ALERT_CLOSE_NOTIFY) {
+                    if ($alert_level == $SSL_ALERT_LEVEL_WARNING
+                            && $alert_description == $SSL_ALERT_CLOSE_NOTIFY) {
                         # Workaround MatrixSSL bug: ALERT packet doesn't removed
                         # from {in_buf}, and next matrixSslDecode() on this {in_buf}
                         # return SSL_ERROR while CLOSE_NOTIFY alert shouldn't be
@@ -116,7 +115,7 @@ sub EVENT { ## no critic (ProhibitExcessComplexity)
                         $self->{in_buf} = q{};
                     }
                     else {
-                        $err ||= "ssl alert: $SSL_alertLevel{$alertLevel}: $SSL_alertDescription{$alertDescription}";
+                        $err ||= "ssl alert: $SSL_alertLevel{$alert_level}: $SSL_alertDescription{$alert_description}";
                         last;
                     }
                 }
@@ -127,7 +126,6 @@ sub EVENT { ## no critic (ProhibitExcessComplexity)
                     $err ||= "matrixSslDecode: unexpected return code ($rc)";
                     last;
                 }
-                ## use critic
             }
         }
     }
@@ -414,11 +412,11 @@ This software is Copyright (c) 2008-2016 by Alex Efros E<lt>powerman@cpan.orgE<g
 
 This is free software, licensed under:
 
-  The GNU Public License
+  The GNU General Public License version 2
 
 instead of less restrictive MIT only because…
 
-MatrixSSL is distributed under the GNU Public License…
+MatrixSSL is distributed under the GNU General Public License…
 
 Crypt::MatrixSSL uses MatrixSSL, and so inherits the same license…
 

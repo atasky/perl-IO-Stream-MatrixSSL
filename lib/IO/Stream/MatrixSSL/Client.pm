@@ -1,4 +1,3 @@
-## no critic (Capitalization)
 package IO::Stream::MatrixSSL::Client;
 use 5.010001;
 use warnings;
@@ -14,20 +13,20 @@ use Crypt::MatrixSSL 1.83;
 use File::ShareDir;
 use Scalar::Util qw( weaken );
 
-use base qw( IO::Stream::MatrixSSL );
+use parent qw( -norequire IO::Stream::MatrixSSL );
 
-use constant trusted_CA
+use constant TRUSTED_CA
     => File::ShareDir::dist_file('IO-Stream-MatrixSSL', 'ca-bundle.crt');
 
 
-# FIXME documentation: cb_validate->cb, default value for trusted_CA
+# FIXME documentation: cb_validate->cb, default value for TRUSTED_CA
 sub new {
     my ($class, $opt) = @_;
     my $self = bless {
-        crt         => undef,       # filename(s) with server certificate(s)
-        key         => undef,       # filename with server private key
+        crt         => undef,       # filename(s) with client's certificate(s)
+        key         => undef,       # filename with client's private key
         pass        => undef,       # password to decrypt private key
-        trusted_CA  => trusted_CA,  # filename(s) with trusted root CA cert(s)
+        trusted_CA  => TRUSTED_CA,  # filename(s) with trusted root CA cert(s)
         cb          => undef,       # callback for validating certificate
         %{$opt},
         out_buf     => q{},                 # modified on: OUT
@@ -47,8 +46,7 @@ sub new {
         _t          => undef,
         _cb_t       => undef,
         }, $class;
-    my $this = $self;
-    weaken($this);
+    weaken(my $this = $self);
     $self->{_cb_t} = sub { $this->T() };
     # Initialize SSL.
     # TODO OPTIMIZATION Cache {_ssl_keys}.
@@ -61,8 +59,7 @@ sub new {
     matrixSslEncodeClientHello($self->{_ssl}, $self->{out_buf}, 0)
         == 0 or croak 'matrixSslEncodeClientHello';
     # Prepare first param for cb.
-    $self->{_param}[0] = $self;
-    weaken $self->{_param}[0];
+    weaken($self->{_param}[0] = $self);
     if (defined $self->{cb}) {
         matrixSslSetCertValidator($self->{_ssl}, $self->{cb}, $self->{_param});
     }
@@ -79,8 +76,7 @@ sub PREPARE {
     while ($io->{_master}) {
         $io = $io->{_master};
     }
-    $self->{_param}[1] = $io;
-    weaken $self->{_param}[1];
+    weaken($self->{_param}[1] = $io);
     $self->{_slave}->PREPARE($fh, $host, $port);
     $self->{_slave}->WRITE();                       # output 'client hello'
     return;
