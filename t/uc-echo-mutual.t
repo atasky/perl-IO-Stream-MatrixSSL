@@ -9,8 +9,8 @@ my $msg     = "Test message!\0\n";
 use constant ACCEPTED => 123;
 @CheckPoint = (
     [ '__ANON__',   ACCEPTED        ], 'accept incoming connection',
-    [ 'validate',   'test.server.com'], 'validate: got certificate for test.server.com',
-    [ 'validate',   'test client'   ], 'validate: got certificate for test client',
+    [ 'validate',   'testsrv'       ], 'validate: got certificate for test server',
+    [ 'validate',   'testcln'       ], 'validate: got certificate for test client',
     [ 'client',     IN              ], 'client: got server banner',
     [ 'client',     $banner         ], 'client: banner is correct',
     [ 'client',     SENT            ], 'client: request sent',
@@ -28,7 +28,6 @@ my ($srv_port) = sockaddr_in(getsockname $srv_sock);
 my $srv_w = EV::io($srv_sock, EV::READ, sub {
     if (accept my $sock, $srv_sock) {
         checkpoint(ACCEPTED);
-      eval {
         IO::Stream->new({
             fh          => $sock,
             cb          => \&server,
@@ -39,15 +38,11 @@ my $srv_w = EV::io($srv_sock, EV::READ, sub {
                 ssl         => IO::Stream::MatrixSSL::Server->new({
                     crt         => 't/cert/testsrv.crt',
                     key         => 't/cert/testsrv.key',
-                    trusted_CA  => 't/cert/testca.crt',
+                    trusted_CA  => 't/cert/ca.crt',
                     cb          => \&validate,
                 }),
             ],
         });
-      };
-      if ($@ && $@ =~ /matrixSslNewSession/) {
-        skip 'no support for client certificates', @CheckPoint/2;
-      }
     }
     elsif ($! != EAGAIN) {
         die "accept: $!\n";
@@ -64,7 +59,7 @@ IO::Stream->new({
         ssl         => IO::Stream::MatrixSSL::Client->new({
             crt         => 't/cert/testcln.crt',
             key         => 't/cert/testcln.key',
-            trusted_CA  => 't/cert/testca.crt',
+            trusted_CA  => 't/cert/ca.crt',
             cb          => \&validate,
         }),
     ],
@@ -98,6 +93,12 @@ sub client {
     if ($err) {
         die $err;
     }
+SKIP: {
+        if ($CheckPoint[0][0] eq 'validate' && $CheckPoint[0][1] eq 'testcln') {
+            splice @CheckPoint, 0, 2;
+            skip 'no support for client certificates', 1;
+        }
+    }
     checkpoint($e);
     if ($e & IN) {
         checkpoint($io->{in_buf});
@@ -115,7 +116,7 @@ sub client {
 }
 
 sub validate {
-    my ($certs, $ssl, $io) = ($_[0], @{ $_[1] });
+    my ($ssl, $certs) = (@_);
     checkpoint($certs->[0]{subject}{commonName});
     return 0;
 }

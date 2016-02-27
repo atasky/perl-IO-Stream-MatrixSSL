@@ -141,43 +141,6 @@ client and server streams).
         If file with private key is encrypted, you should provide password for
         decrypting it in this parameter.
 
-# DIAGNOSTICS
-
-## IO::Stream::MatrixSSL::Client
-
-- `matrixSslReadKeys: wrong {trusted_CA}?`
-
-    File with trusted CA certificates can't be read. If you provide own file,
-    there some problem with it. If you doesn't provided own file, then probably
-    this module was installed incorrectly - there should be default file with
-    trusted CA certificates (taken from Mozilla) installed with module.
-
-- `matrixSslNewSession: wrong {_ssl_session}?`
-
-    This error shouldn't happens, it mean there some bug in this module,
-    or Crypt::MatrixSSL, or MatrixSSL itself.
-
-- `matrixSslEncodeClientHello`
-
-    This error shouldn't happens, it mean there some bug in this module,
-    or Crypt::MatrixSSL, or MatrixSSL itself.
-
-## IO::Stream::MatrixSSL::Server
-
-- `{crt} and {key} required`
-
-    You can't create SSL server without certificate and key files.
-
-- `matrixSslReadKeys: wrong {crt}, {key} or {pass}?`
-
-    Certificate and key files you provided can't be read by MatrixSSL,
-    or may be you used wrong password for key file.
-
-- `matrixSslNewSession`
-
-    This error shouldn't happens, it mean there some bug in this module,
-    or Crypt::MatrixSSL, or MatrixSSL itself.
-
 # SUPPORT
 
 ## Bugs / Feature Requests
@@ -224,7 +187,7 @@ Alex Efros &lt;powerman@cpan.org>
 
 # COPYRIGHT AND LICENSE
 
-This software is Copyright (c) 2008-2016 by Alex Efros &lt;powerman@cpan.org>.
+This software is Copyright (c) 2008- by Alex Efros &lt;powerman@cpan.org>.
 
 This is free software, licensed under:
 
@@ -234,8 +197,8 @@ instead of less restrictive MIT only because…
 
 MatrixSSL is distributed under the GNU General Public License…
 
-Crypt::MatrixSSL uses MatrixSSL, and so inherits the same license…
+Crypt::MatrixSSL3 uses MatrixSSL, and so inherits the same license…
 
-IO::Stream::MatrixSSL uses Crypt::MatrixSSL, and so inherits the same license.
+IO::Stream::MatrixSSL uses Crypt::MatrixSSL3, and so inherits the same license.
 
 GPL is a virus, avoid it whenever possible!

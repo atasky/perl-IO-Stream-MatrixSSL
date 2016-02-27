@@ -53,7 +53,7 @@ IO::Stream->new({
     in_buf_limit=> 1024,
     plugin      => [
         ssl         => IO::Stream::MatrixSSL::Client->new({
-            trusted_CA  => 't/cert/testca.crt',
+            trusted_CA  => 't/cert/ca.crt',
         }),
     ],
 });

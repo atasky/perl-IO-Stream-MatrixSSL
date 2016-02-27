@@ -3,6 +3,7 @@ use warnings;
 use strict;
 use IO::Stream::MatrixSSL::const;
 BEGIN {
+    no warnings 'redefine';
     *IO::Stream::MatrixSSL::const::TOHANDSHAKE = sub () { 0.1 };
 }
 use t::share;

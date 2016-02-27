@@ -9,24 +9,20 @@ our $VERSION = 'v1.1.2';
 
 use IO::Stream::const;
 use IO::Stream::MatrixSSL::const;
-use Crypt::MatrixSSL 1.83;
-use File::ShareDir;
+use Crypt::MatrixSSL3 qw( :all );
 use Scalar::Util qw( weaken );
 
 use parent qw( -norequire IO::Stream::MatrixSSL );
 
-use constant TRUSTED_CA
-    => File::ShareDir::dist_file('IO-Stream-MatrixSSL', 'ca-bundle.crt');
 
-
-# FIXME documentation: cb_validate->cb, default value for TRUSTED_CA
+# FIXME documentation: cb_validate->cb, default value for trusted_CA
 sub new {
     my ($class, $opt) = @_;
     my $self = bless {
         crt         => undef,       # filename(s) with client's certificate(s)
         key         => undef,       # filename with client's private key
         pass        => undef,       # password to decrypt private key
-        trusted_CA  => TRUSTED_CA,  # filename(s) with trusted root CA cert(s)
+        trusted_CA  => $Crypt::MatrixSSL3::CA_CERTIFICATES, # filename(s) with trusted root CA cert(s)
         cb          => undef,       # callback for validating certificate
         %{$opt},
         out_buf     => q{},                 # modified on: OUT
@@ -36,33 +32,41 @@ sub new {
         in_bytes    => 0,                   # modified on: IN
         ip          => undef,               # modified on: RESOLVED
         is_eof      => undef,               # modified on: EOF
-        _param      => [],          # param for cb
         # TODO Make this field public and add feature 'restore session'.
-        _ssl_session=> undef,       # MatrixSSL 'sessionId' object
+        # _ssl_session=> undef,       # MatrixSSL 'sessionId' object
         _ssl        => undef,       # MatrixSSL 'session' object
         _ssl_keys   => undef,       # MatrixSSL 'keys' object
         _handshaked => 0,           # flag, will be true after handshake
-        _want_write => undef,
+        _want_write => 0,           # flag, will be true if write() was called before handshake
+        _want_close => 0,           # flag, will be true after generating MATRIXSSL_REQUEST_CLOSE
+        _closed     => 0,           # flag, will be true after sending MATRIXSSL_REQUEST_CLOSE
         _t          => undef,
         _cb_t       => undef,
         }, $class;
     weaken(my $this = $self);
-    $self->{_cb_t} = sub { $this->T() };
+    $self->{_cb_t} = sub { $this && $this->T() };
+    my $cb = !$self->{cb} ? undef : sub {
+        $this ? $this->{cb}->($this, @_) : CERTVALIDATOR_INTERNAL_ERROR
+    };
     # Initialize SSL.
     # TODO OPTIMIZATION Cache {_ssl_keys}.
-    matrixSslReadKeys($self->{_ssl_keys}, $self->{crt}, $self->{key},
-        $self->{pass}, $self->{trusted_CA})
-        == 0 or croak 'matrixSslReadKeys: wrong {crt}, {key}, {pass} or {trusted_CA}?';
-    matrixSslNewSession($self->{_ssl}, $self->{_ssl_keys},
-        $self->{_ssl_session}, 0)
-        == 0 or croak 'matrixSslNewSession: wrong {_ssl_session}?';
-    matrixSslEncodeClientHello($self->{_ssl}, $self->{out_buf}, 0)
-        == 0 or croak 'matrixSslEncodeClientHello';
-    # Prepare first param for cb.
-    weaken($self->{_param}[0] = $self);
-    if (defined $self->{cb}) {
-        matrixSslSetCertValidator($self->{_ssl}, $self->{cb}, $self->{_param});
-    }
+    $self->{_ssl_keys} = Crypt::MatrixSSL3::Keys->new();
+    my $rc = $self->{_ssl_keys}->load_rsa(
+        $self->{crt}, $self->{key}, $self->{pass}, $self->{trusted_CA}
+    );
+    croak 'ssl error: '.get_ssl_error($rc) if $rc != PS_SUCCESS;
+    # TODO OPTIMIZATION Use {_ssl_session}.
+    # TODO Add feature: let user provide @cipherSuites.
+    # TODO Add feature: let user provide $expectedName.
+    $self->{_ssl} = Crypt::MatrixSSL3::Client->new(
+        $self->{_ssl_keys}, undef, undef, $cb, undef, undef, undef
+    );
+#say "#   new($self) {out_buf} len at enter = ", length $self->{out_buf};
+    my $rc_n = $self->{_ssl}->get_outdata($self->{out_buf});
+#say "#   new($self) {out_buf} len at leave = ", length $self->{out_buf};
+    croak 'ssl error: '.get_ssl_error($rc_n) if $rc_n < 0;
+    $rc = $self->{_ssl}->sent_data($rc_n);
+    croak 'ssl error: '.get_ssl_error($rc) if $rc != PS_SUCCESS;
     return $self;
 }
 
@@ -71,14 +75,10 @@ sub PREPARE {
     if (!defined $host) {   # ... else timer will be set on CONNECTED
         $self->{_t} = EV::timer(TOHANDSHAKE, 0, $self->{_cb_t});
     }
-    # Prepare second param for cb.
-    my $io = $self;
-    while ($io->{_master}) {
-        $io = $io->{_master};
-    }
-    weaken($self->{_param}[1] = $io);
     $self->{_slave}->PREPARE($fh, $host, $port);
+#say "# PREPR($self) {out_buf} len at enter = ", length $self->{out_buf};
     $self->{_slave}->WRITE();                       # output 'client hello'
+#say "# PREPR($self) {out_buf} len at leave = ", length $self->{out_buf};
     return;
 }
 

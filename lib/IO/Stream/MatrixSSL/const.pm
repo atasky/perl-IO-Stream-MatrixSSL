@@ -12,12 +12,13 @@ use constant TOHANDSHAKE    => 30;
 
 # Custom errors:
 use constant ETOHANDSHAKE   => 'ssl handshake timeout';
+use constant CERTVALIDATOR_INTERNAL_ERROR => -1;
 
 
 sub import {
     my $pkg = caller;
     no strict 'refs';
-    for my $const (qw( TOHANDSHAKE ETOHANDSHAKE )) {
+    for my $const (qw( TOHANDSHAKE ETOHANDSHAKE CERTVALIDATOR_INTERNAL_ERROR )) {
         *{"${pkg}::$const"} = \&{$const};
     }
     return;

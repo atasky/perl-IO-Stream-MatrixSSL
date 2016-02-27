@@ -39,11 +39,11 @@
       },
       "runtime" : {
          "requires" : {
-            "Crypt::MatrixSSL" : "1.83",
-            "File::ShareDir" : "0",
+            "Crypt::MatrixSSL3" : "v3.7.3",
             "IO::Stream" : "0",
             "IO::Stream::const" : "0",
             "Scalar::Util" : "0",
+            "parent" : "0",
             "perl" : "5.010001"
          }
       },

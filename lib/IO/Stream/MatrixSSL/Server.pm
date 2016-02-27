@@ -9,10 +9,11 @@ our $VERSION = 'v1.1.2';
 
 use IO::Stream::const;
 use IO::Stream::MatrixSSL::const;
-use Crypt::MatrixSSL 1.83;
+use Crypt::MatrixSSL3 qw( :all );
 use Scalar::Util qw( weaken );
 
 use parent qw( -norequire IO::Stream::MatrixSSL );
+
 
 sub new {
     my ($class, $opt) = @_;
@@ -32,33 +33,28 @@ sub new {
         in_bytes    => 0,                   # modified on: IN
         ip          => undef,               # modified on: RESOLVED
         is_eof      => undef,               # modified on: EOF
-        _param      => [],          # param for cb
         _ssl        => undef,       # MatrixSSL 'session' object
         _ssl_keys   => undef,       # MatrixSSL 'keys' object
         _handshaked => 0,           # flag, will be true after handshake
-        _want_write => undef,
+        _want_write => 0,           # flag, will be true if write() was called before handshake
+        _want_close => 0,           # flag, will be true after generating MATRIXSSL_REQUEST_CLOSE
+        _closed     => 0,           # flag, will be true after sending MATRIXSSL_REQUEST_CLOSE
         _t          => undef,
         _cb_t       => undef,
         }, $class;
     weaken(my $this = $self);
-    $self->{_cb_t} = sub { $this->T() };
+    $self->{_cb_t} = sub { $this && $this->T() };
+    my $cb = !$self->{cb} ? undef : sub {
+        $this ? $this->{cb}->($this, @_) : CERTVALIDATOR_INTERNAL_ERROR
+    };
     # Initialize SSL.
     # TODO OPTIMIZATION Cache {_ssl_keys}.
-    matrixSslReadKeys($self->{_ssl_keys}, $self->{crt}, $self->{key},
-        $self->{pass}, $self->{trusted_CA})
-        == 0 or croak 'matrixSslReadKeys: wrong {crt}, {key}, {pass} or {trusted_CA}?';
-    my $flags = $SSL_FLAGS_SERVER;
-    if (defined $self->{trusted_CA}) {
-        $flags |= $SSL_FLAGS_CLIENT_AUTH;
-    }
-    matrixSslNewSession($self->{_ssl}, $self->{_ssl_keys},
-        undef, $flags)
-        == 0 or croak 'matrixSslNewSession';
-    # Prepare first param for cb.
-    weaken($self->{_param}[0] = $self);
-    if (defined $self->{cb}) {
-        matrixSslSetCertValidator($self->{_ssl}, $self->{cb}, $self->{_param});
-    }
+    $self->{_ssl_keys} = Crypt::MatrixSSL3::Keys->new();
+    my $rc = $self->{_ssl_keys}->load_rsa(
+        $self->{crt}, $self->{key}, $self->{pass}, $self->{trusted_CA}
+    );
+    croak 'ssl error: '.get_ssl_error($rc) if $rc != PS_SUCCESS;
+    $self->{_ssl} = Crypt::MatrixSSL3::Server->new($self->{_ssl_keys}, $cb);
     return $self;
 }
 
@@ -67,12 +63,6 @@ sub PREPARE {
     if (!defined $host) {   # ... else timer will be set on CONNECTED
         $self->{_t} = EV::timer(TOHANDSHAKE, 0, $self->{_cb_t});
     }
-    # Prepare second param for cb.
-    my $io = $self;
-    while ($io->{_master}) {
-        $io = $io->{_master};
-    }
-    weaken($self->{_param}[1] = $io);
     $self->{_slave}->PREPARE($fh, $host, $port);
     return;
 }

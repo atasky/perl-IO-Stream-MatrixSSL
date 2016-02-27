@@ -14,10 +14,8 @@ use EV;
 use IO::Stream;
 use IO::Stream::MatrixSSL;
 
-## MatrixSSL must be initialized before use!
-#Crypt::MatrixSSL::matrixSslOpen()
-#    == 0 or die 'matrixSslOpen';
-#END { Crypt::MatrixSSL::matrixSslClose() }
+# Crypt::MatrixSSL3::Open();
+# END { Crypt::MatrixSSL3::Close() }
 
 use Carp::Heavy;
 $SIG{PIPE}  = 'IGNORE';

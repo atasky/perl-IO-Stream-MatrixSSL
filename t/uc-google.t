@@ -27,7 +27,7 @@ plan tests => 1 + @CheckPoint/2;
 EV::loop;
 
 sub validate {
-    my ($certs, $ssl, $io) = ($_[0], @{ $_[1] });
+    my ($ssl, $certs) = @_;
     checkpoint($certs->[0]{subject}{commonName});
     return 0;
 }

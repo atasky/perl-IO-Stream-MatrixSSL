@@ -1,10 +1,10 @@
 requires 'perl', '5.010001';
 
-requires 'Crypt::MatrixSSL', '1.83';
-requires 'File::ShareDir';
+requires 'Crypt::MatrixSSL3', 'v3.7.3';
 requires 'IO::Stream';
 requires 'IO::Stream::const';
 requires 'Scalar::Util';
+requires 'parent';
 
 on configure => sub {
     requires 'Module::Build::Tiny', '0.034';

@@ -6,10 +6,12 @@ use t::share;
 if ($INC{'Devel/Cover.pm'}) {
     plan skip_all => 'unable to test under Devel::Cover';
 }
-plan tests => 4;
 
 leaktest('create_client_stream');
 leaktest('create_server_stream');
+
+done_testing();
+
 
 sub create_client_stream {
     IO::Stream->new({
@@ -40,25 +42,47 @@ sub create_server_stream {
 
 sub leaktest {
     my $test = shift;
-    my %arg  = (init=>10, test=>1000, max_mem_diff=>100, diag=>1, @_);
-    my $code = do { no strict 'refs'; \&$test };
+    my %arg  = (init=>10, test=>1000, max_mem_diff=>256, diag=>0, @_);
+    my $tmp = 'x' x 1000000; undef $tmp;
+    my $code = sub { no strict 'refs'; \&$test(); };
     $code->() for 1 .. $arg{init};
     my $mem = MEM_used();
     my $fd  = FD_used();
     $code->() for 1 .. $arg{test};
-    diag sprintf "---- MEM\nWAS: %d\nNOW: %d\n", $mem, MEM_used() if $arg{diag};
-    ok( abs(MEM_used() - $mem) < $arg{max_mem_diff},  "MEM: $test" );
-    is(FD_used(), $fd,                                " FD: $test" );
+    diag sprintf("---- MEM $test\nWAS: %d\nNOW: %d\n", $mem, MEM_used()) if $arg{diag};
+    cmp_ok(abs(MEM_used() - $mem), '<=', $arg{max_mem_diff}, "MEM: $test" );
+    is(FD_used(), $fd, " FD: $test" );
+}
+
+sub Cat {
+    croak 'usage: Cat( FILENAME )' if @_ != 1;
+    my ($filename) = @_;
+    open my $f, '<', $filename or croak "open: $!";
+    local $/ if !wantarray;
+    return <$f>;
 }
 
 sub MEM_used {
-    open my $f, '<', '/proc/self/status';
-    my $status = join q{}, <$f>;
-    return ($status =~ /VmRSS:\s*(\d*)/)[0];
-};
+    if ($^O =~ /linux/) {
+        return (Cat('/proc/self/status') =~ /VmRSS:\s*(\d*)/)[0];
+    }
+    elsif ($^O =~ /Win32/) {
+        # FIXME this will fail on non-English Win7
+        my ($m) = `tasklist /nh /fi "PID eq $$"` =~/.*\s([\d,]+)/;
+        $m=~tr/,//d;
+        return $m;
+    }
+    else {
+        return (`ps -o'rss' -p $$` =~ /(\d+)/);
+    }
+}
 
 sub FD_used {
-    opendir my $fd, '/proc/self/fd' or croak "opendir: $!";
-    return @{[ readdir $fd ]} - 2;
-};
-
+    if ($^O =~ /linux/) {
+        opendir my $fd, '/proc/self/fd' or croak "opendir: $!";
+        return @{[ readdir $fd ]} - 2;
+    }
+    else {
+        return 0;
+    }
+}

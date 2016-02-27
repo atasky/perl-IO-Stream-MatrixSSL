@@ -9,18 +9,20 @@ our $VERSION = 'v1.1.2';
 
 use IO::Stream::const;
 use IO::Stream::MatrixSSL::const;
-use Crypt::MatrixSSL 1.83;
+use Crypt::MatrixSSL3 qw( :all );
 
 use IO::Stream::MatrixSSL::Client;
 use IO::Stream::MatrixSSL::Server;
 
 
-sub DESTROY {
+# TODO update doc: {cb} params changed, ->stream() added
+sub stream {
     my ($self) = @_;
-    # Free memory in MatrixSSL.
-    matrixSslDeleteSession($self->{_ssl});
-    matrixSslFreeKeys($self->{_ssl_keys});
-    return;
+    my $stream = $self;
+    while ($stream->{_master}) {
+        $stream = $stream->{_master};
+    }
+    return $stream;
 }
 
 sub T {
@@ -32,18 +34,39 @@ sub T {
 
 sub WRITE {
     my ($self) = @_;
-    if (!$self->{_handshaked}) {
+    my $m = $self->{_master};
+    if ($self->{_closed}) {
+        $m->EVENT(0, 'ssl closed: closure alert or fatal alert was sent');
+    }
+    elsif (!$self->{_handshaked}) {
         $self->{_want_write} = 1;
     }
-    else {
-        my $m = $self->{_master};
+    elsif (!$self->{_want_close}) {
         my $s = substr $m->{out_buf}, $m->{out_pos}||0;
         my $n = length $s;
+ENCODE:
+#say "# WRITE($self) {out_buf} len at enter = ", length $self->{out_buf};
         while (length $s) {
-            my $s2 = substr $s, 0, $SSL_MAX_PLAINTEXT_LEN, q{};
-            if (matrixSslEncode($self->{_ssl}, $s2, $self->{out_buf}) < 0) {
-                $m->EVENT(0, 'matrixSslEncode');
-                return;
+            my $s2 = substr $s, 0, SSL_MAX_PLAINTEXT_LEN, q{};
+#say "# WRITE($self) {out_buf} len in while = ", length $s;
+            my $rc = $self->{_ssl}->encode_to_outdata($s2);
+#say "# WRITE($self) encode_to_outdata = ", get_ssl_error($rc);
+            return $m->EVENT(0, 'ssl error: '.get_ssl_error($rc)) if $rc <= 0;
+            while (my $rc_n = $self->{_ssl}->get_outdata($self->{out_buf})) {
+#say "# WRITE($self) get_outdata = ", $rc_n < 0 ? get_ssl_error($rc_n) : $rc_n;
+                return $m->EVENT(0, 'ssl error: '.get_ssl_error($rc_n)) if $rc_n < 0;
+                $rc = $self->{_ssl}->sent_data($rc_n);
+#say "# WRITE($self) sent_data = ", get_ssl_error($rc);
+                last if $rc == PS_SUCCESS;
+                next if $rc == MATRIXSSL_REQUEST_SEND;
+                next if $rc == MATRIXSSL_HANDSHAKE_COMPLETE;
+                if ($rc == MATRIXSSL_REQUEST_CLOSE) {
+                    $self->{_want_close} = 1;
+                    # XXX Will report to $m "{out_buf} was completely sent"
+                    # while is may be only partially sent.
+                    last ENCODE;
+                }
+                return $m->EVENT(0, 'ssl error: '.get_ssl_error($rc));
             }
         }
         if (defined $m->{out_pos}) {
@@ -52,8 +75,11 @@ sub WRITE {
             $m->{out_buf} = q{};
         }
         $m->{out_bytes} += $n;
+#say "# WRITE($self) {out_buf} len at EVENT = ", length $self->{out_buf};
         $m->EVENT(OUT);
+#say "# WRITE($self) {out_buf} len at WRITE = ", length $self->{out_buf};
         $self->{_slave}->WRITE();
+#say "# WRITE($self) {out_buf} len at leave = ", length $self->{out_buf};
     }
     return;
 }
@@ -61,6 +87,10 @@ sub WRITE {
 sub EVENT { ## no critic (ProhibitExcessComplexity)
     my ($self, $e, $err) = @_;
     my $m = $self->{_master};
+    if ($e & SENT && $self->{_want_close}) {
+        $self->{_closed} = 1;
+        $err ||= 'ssl closed: closure alert or fatal alert was sent';
+    }
     $e &= ~OUT;
     if (!$self->{_handshaked}) {
         $e &= ~SENT;
@@ -68,66 +98,88 @@ sub EVENT { ## no critic (ProhibitExcessComplexity)
     return if !$e && !$err;
     if ($e & IN) {
         $e &= ~IN;
-        while (length $self->{in_buf}) {
-            my ($error, $alert_level, $alert_description);
-            my $rc = matrixSslDecode($self->{_ssl}, $self->{in_buf},
-                my $buf=q{}, $error, $alert_level, $alert_description);
-            if ($rc == $SSL_PROCESS_DATA) {
+RECV:
+        my @warnings;
+#say "# EVENT($self)  {in_buf} len at enter = ", length $self->{in_buf};
+        while (my $rc_n = $self->{_ssl}->get_readbuf($self->{in_buf})) {
+#say "# EVENT($self) get_readbuf = ", $rc_n < 0 ? get_ssl_error($rc_n) : $rc_n;
+#say "# EVENT($self)  {in_buf} len in while = ", length $self->{in_buf};
+            if ($rc_n < 0) {
+                $err ||= 'ssl error: '.get_ssl_error($rc_n);
+                last;
+            }
+            my $rc = $self->{_ssl}->received_data($rc_n, my $buf);
+#say "# EVENT($self) received_data = ", get_ssl_error($rc);
+RC:
+            last if $rc == PS_SUCCESS;
+            next if $rc == MATRIXSSL_REQUEST_RECV;
+            next if $rc == MATRIXSSL_REQUEST_SEND;
+            if ($rc == MATRIXSSL_HANDSHAKE_COMPLETE) {
+                $self->_handshaked();
+                next;
+            }
+            if ($rc == MATRIXSSL_RECEIVED_ALERT) {
+                my ($level, $descr) = get_ssl_alert($buf);
+                if ($level == SSL_ALERT_LEVEL_FATAL) {
+                    $self->{_ssl}->processed_data($buf);
+                    $err ||= "ssl fatal alert: $descr";
+                    last;
+                }
+                if ($descr != SSL_ALERT_CLOSE_NOTIFY) {
+                    push @warnings, $descr;
+                }
+            }
+            elsif ($rc == MATRIXSSL_APP_DATA) {
+                $self->_handshaked();
                 $e |= IN;
                 $m->{in_buf}    .= $buf;
                 $m->{in_bytes}  += length $buf;
             }
-            else {
-                $self->{out_buf} .= $buf;
-                $self->{_slave}->WRITE();
-                ## no critic (ProhibitCascadingIfElse ProhibitDeepNests)
-                if ($rc == $SSL_SUCCESS || $rc == $SSL_SEND_RESPONSE) {
-                    if (!$self->{_handshaked}) {
-                        if (matrixSslHandshakeIsComplete($self->{_ssl})) {
-                            $self->{_handshaked} = 1;
-                            undef $self->{_t};
-                            if ($self->{_want_write}) {
-                                $self->WRITE();
-                            }
-                        }
-                    }
-                }
-                # WARNING   After $SSL_ERROR or $SSL_ALERT {in_buf} may
-                # contain non-decoded packets. These packets will be lost,
-                # except in case user will not $stream->close() on this
-                # error AND there will be more data later (got EPOLLIN).
-                # This behaviour is ok because all ERROR/ALERT are fatal
-                # anyway (except NO_CERTIFICATE).
-                # TODO FIXME    If we'll support commercial MatrixSSL we
-                # should add handling for NO_CERTIFICATE case.
-                elsif ($rc == $SSL_ERROR) {
-                    $err ||= "ssl error: $SSL_alertDescription{$error}";
-                    last;
-                }
-                elsif ($rc == $SSL_ALERT) {
-                    if ($alert_level == $SSL_ALERT_LEVEL_WARNING
-                            && $alert_description == $SSL_ALERT_CLOSE_NOTIFY) {
-                        # Workaround MatrixSSL bug: ALERT packet doesn't removed
-                        # from {in_buf}, and next matrixSslDecode() on this {in_buf}
-                        # return SSL_ERROR while CLOSE_NOTIFY alert shouldn't be
-                        # error at all. :(
-                        # TODO Is it still needed in Crypt::MatrixSSL 1.83?
-                        $self->{in_buf} = q{};
-                    }
-                    else {
-                        $err ||= "ssl alert: $SSL_alertLevel{$alert_level}: $SSL_alertDescription{$alert_description}";
-                        last;
-                    }
-                }
-                elsif ($rc == $SSL_PARTIAL) {
-                    last;
-                }
-                else {
-                    $err ||= "matrixSslDecode: unexpected return code ($rc)";
-                    last;
-                }
+            elsif ($rc == MATRIXSSL_APP_DATA_COMPRESSED) {
+                $self->_handshaked();
+                $err ||= 'ssl error: not implemented because USE_ZLIB_COMPRESSION should not be enabled';
+                last;
             }
+            else {
+                $err ||= 'ssl error: '.get_ssl_error($rc);
+                last;
+            }
+            $rc = $self->{_ssl}->processed_data($buf);
+#say "# EVENT($self) processed_data = ", get_ssl_error($rc);
+            goto RC;
         }
+#say "# EVENT($self)  {in_buf} len at leave = ", length $self->{in_buf};
+        if (@warnings) {
+            # XXX warning alert(s) may be lost if some other error or
+            # fatal alert happens after warning alert(s).
+            $err ||= join q{ }, 'ssl warning alert:', @warnings;
+        }
+SEND:
+#say "# EVENT($self) {out_buf} len at enter = ", length $self->{out_buf};
+        while (my $rc_n = $self->{_ssl}->get_outdata($self->{out_buf})) {
+#say "# EVENT($self) get_outdata = ", $rc_n < 0 ? get_ssl_error($rc_n) : $rc_n;
+#say "# EVENT($self) {out_buf} len in while = ", length $self->{out_buf};
+            return $m->EVENT(0, 'ssl error: '.get_ssl_error($rc_n)) if $rc_n < 0;
+            my $rc = $self->{_ssl}->sent_data($rc_n);
+#say "# EVENT($self) sent_data = ", get_ssl_error($rc);
+            last if $rc == PS_SUCCESS;
+            next if $rc == MATRIXSSL_REQUEST_SEND;
+            if ($rc == MATRIXSSL_HANDSHAKE_COMPLETE) {
+                $self->_handshaked();
+                next;
+            }
+            if ($rc == MATRIXSSL_REQUEST_CLOSE) {
+                $self->{_want_close} = 1;
+                last;
+            }
+            $err ||= 'ssl error: '.get_ssl_error($rc);
+            last;
+        }
+#say "# EVENT($self) {out_buf} len at WRITE = ", length $self->{out_buf};
+        if (length $self->{out_buf}) {
+            $self->{_slave}->WRITE();
+        }
+#say "# EVENT($self) {out_buf} len at leave = ", length $self->{out_buf};
     }
     if ($e & RESOLVED) {
         $m->{ip} = $self->{ip};
@@ -142,6 +194,18 @@ sub EVENT { ## no critic (ProhibitExcessComplexity)
         $self->{_t} = EV::timer(TOHANDSHAKE, 0, $self->{_cb_t});
     }
     $m->EVENT($e, $err);
+    return;
+}
+
+sub _handshaked {
+    my ($self) = @_;
+    if (!$self->{_handshaked}) {
+        $self->{_handshaked} = 1;
+        undef $self->{_t};
+        if ($self->{_want_write}) {
+            $self->WRITE();
+        }
+    }
     return;
 }
 
@@ -310,52 +374,6 @@ decrypting it in this parameter.
 =back
 
 
-=head1 DIAGNOSTICS
-
-=head2 IO::Stream::MatrixSSL::Client
-
-=over
-
-=item C<< matrixSslReadKeys: wrong {trusted_CA}? >>
-
-File with trusted CA certificates can't be read. If you provide own file,
-there some problem with it. If you doesn't provided own file, then probably
-this module was installed incorrectly - there should be default file with
-trusted CA certificates (taken from Mozilla) installed with module.
-
-=item C<< matrixSslNewSession: wrong {_ssl_session}? >>
-
-This error shouldn't happens, it mean there some bug in this module,
-or Crypt::MatrixSSL, or MatrixSSL itself.
-
-=item C<< matrixSslEncodeClientHello >>
-
-This error shouldn't happens, it mean there some bug in this module,
-or Crypt::MatrixSSL, or MatrixSSL itself.
-
-=back
-
-=head2 IO::Stream::MatrixSSL::Server
-
-=over
-
-=item C<< {crt} and {key} required >>
-
-You can't create SSL server without certificate and key files.
-
-=item C<< matrixSslReadKeys: wrong {crt}, {key} or {pass}? >>
-
-Certificate and key files you provided can't be read by MatrixSSL,
-or may be you used wrong password for key file.
-
-=item C<< matrixSslNewSession >>
-
-This error shouldn't happens, it mean there some bug in this module,
-or Crypt::MatrixSSL, or MatrixSSL itself.
-
-=back
-
-
 =head1 SUPPORT
 
 =head2 Bugs / Feature Requests
@@ -408,7 +426,7 @@ Alex Efros E<lt>powerman@cpan.orgE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-This software is Copyright (c) 2008-2016 by Alex Efros E<lt>powerman@cpan.orgE<gt>.
+This software is Copyright (c) 2008- by Alex Efros E<lt>powerman@cpan.orgE<gt>.
 
 This is free software, licensed under:
 
@@ -418,9 +436,9 @@ instead of less restrictive MIT only because…
 
 MatrixSSL is distributed under the GNU General Public License…
 
-Crypt::MatrixSSL uses MatrixSSL, and so inherits the same license…
+Crypt::MatrixSSL3 uses MatrixSSL, and so inherits the same license…
 
-IO::Stream::MatrixSSL uses Crypt::MatrixSSL, and so inherits the same license.
+IO::Stream::MatrixSSL uses Crypt::MatrixSSL3, and so inherits the same license.
 
 GPL is a virus, avoid it whenever possible!
 
