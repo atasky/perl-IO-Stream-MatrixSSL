@@ -15,7 +15,6 @@ use Scalar::Util qw( weaken );
 use parent qw( -norequire IO::Stream::MatrixSSL );
 
 
-# FIXME documentation: cb_validate->cb, default value for trusted_CA
 sub new {
     my ($class, $opt) = @_;
     my $self = bless {
@@ -24,7 +23,7 @@ sub new {
         pass        => undef,       # password to decrypt private key
         trusted_CA  => $Crypt::MatrixSSL3::CA_CERTIFICATES, # filename(s) with trusted root CA cert(s)
         cb          => undef,       # callback for validating certificate
-        %{$opt},
+        %{$opt // {}},
         out_buf     => q{},                 # modified on: OUT
         out_pos     => undef,               # modified on: OUT
         out_bytes   => 0,                   # modified on: OUT

@@ -39,7 +39,8 @@ This document describes IO::Stream::MatrixSSL version v1.1.2
         ],
     });
     sub validate {
-        my ($certs, $ssl, $stream) = ($_[0], @{ $_[1] });
+        my ($ssl, $certs) = @_;
+        my $stream = $ssl->stream();
         # check cert, for ex.: $certs->[0]{subject}{commonName}
         return 0;
     }
@@ -49,97 +50,113 @@ This document describes IO::Stream::MatrixSSL version v1.1.2
 This module is plugin for IO::Stream which allow you to use SSL (on both
 client and server streams).
 
-# INTERFACE 
+# INTERFACE
 
-- IO::Stream::MatrixSSL::Client->new(\\%opt)
+## IO::Stream::MatrixSSL::Client
 
-    Create and return new IO::Stream plugin object.
+### new
 
-    There two optional parameters:
+    $plugin_ssl_client = IO::Stream::MatrixSSL::Client->new();
 
-    - cb
+    $plugin_ssl_client = IO::Stream::MatrixSSL::Client->new({
+        crt         => '/path/to/client.crt',
+        key         => '/path/to/client.key',
+        pass        => 's3cret',
+        trusted_CA  => '/path/to/ca-bundle.crt',
+        cb          => \&validate,
+    });
 
-        This should be CODE ref to your callback, which should check server
-        certificate. Callback will be called with two parameters: HASH ref with
-        certificate details, and ARRAY ref with two elements:
-        IO::Stream::MatrixSSL::Client object and IO::Stream object (see [SYNOPSIS](https://metacpan.org/pod/SYNOPSIS)
-        for example).
+Create and returns new IO::Stream plugin object.
 
-        Callback should return a number >=0 if this certificate is acceptable,
-        and we can continue with SSL handshake, or number <0 if this certificate
-        isn't acceptable and we should interrupt this connection and return error
-        to IO::Stream user callback. If this function will throw exception, it will
-        be handled just as return(-1).
+- crt
+- key
+- pass
 
-        Hash with certificate details will looks this way:
+    Authenticate client on server using client's certificate.
+    (You'll need Crypt::MatrixSSL3 compiled with support for client authentication.)
 
-            verified       => $verified,
-            notBefore      => $notBefore,
-            notAfter       => $notAfter,
-            subjectAltName => {
-                dns             => $dns,
-                uri             => $uri,
-                email           => $email,
-                },
-            subject        => {
-                country         => $country,
-                state           => $state,
-                locality        => $locality,
-                organization    => $organization,
-                orgUnit         => $orgUnit,
-                commonName      => $commonName,
-                },
-            issuer         => {
-                country         => $country,
-                state           => $state,
-                locality        => $locality,
-                organization    => $organization,
-                orgUnit         => $orgUnit,
-                commonName      => $commonName,
-                },
+    `crt` and `key` should contain file names of client's certificate and
+    private key (in PEM format), `pass` should contain password (as string)
+    for private key.
 
-        where all values are just strings except these:
+    You can provide multiple file names with client's certificates in `crt`
+    separated by `;`.
 
-            $verified
-                Status of cetrificate RSA signature check:
-                -1  signature is wrong
-                 1  signature is correct
-            $notBefore
-            $notAfter
-                Time period when certificate is active, in format
-                YYYYMMDDHHMMSSZ     (for ex.: 20061231235959Z)
+    All optional (`crt` and `key` should be either both provided or both omitted,
+    `pass` should be provided only if `key` file protected by password).
 
-    - trusted\_CA
+- trusted\_CA
 
-        This should be name of file (or files) with allowed CA certificates,
-        required to check RSA signature of server certificate. This module
-        installed with such file, so chances are you doesn't need to change
-        default {trusted\_CA} value if you just wanna connect to https servers.
+    This should be name of file (or files) with allowed CA certificates,
+    required to check RSA signature of server certificate. Crypt::MatrixSSL3
+    provides such a file, so chances are you doesn't need to change default
+    {trusted\_CA} value (`$Crypt::MatrixSSL3::CA_CERTIFICATES`) if you just
+    wanna connect to public https servers.
 
-        There may be many files listed in {trusted\_CA}, separated by ";".
-        Each file can contain many CA certificates.
+    There may be many files listed in {trusted\_CA}, separated by `;`.
+    Each file can contain many CA certificates.
 
-- IO::Stream::MatrixSSL::Server->new(\\%opt)
+- cb
 
-    Create and return new IO::Stream plugin object.
+    This should be CODE ref to your callback, which will check server
+    certificate. Callback will be called with two parameters:
+    IO::Stream::MatrixSSL::Client (or IO::Stream::MatrixSSL::Server - if
+    you're validating client's certificate) object and HASH ref with
+    certificate details (see ["SYNOPSIS"](#synopsis) for example).
 
-    There at least two required parameters: {crt} and {key}. If {key} is
-    encrypted, then one more parameter required: {pass}.
+    Callback should return a number >=0 if this certificate is acceptable,
+    and we can continue with SSL handshake, or number <0 if this certificate
+    isn't acceptable and we should interrupt this connection and return error
+    to IO::Stream user callback. If this function will throw exception, it will
+    be handled just as return(-1).
 
-    - crt
+    Hash with certificate details will looks this way:
 
-        This should be name of file (or files) with server certificate (or chain
-        of certificates). See above {trusted\_CA} about format of this parameter.
+        verified       => $verified,
+        notBefore      => $notBefore,
+        notAfter       => $notAfter,
+        subjectAltName => {
+            dns             => $dns,
+            uri             => $uri,
+            email           => $email,
+            },
+        subject        => {
+            country         => $country,
+            state           => $state,
+            locality        => $locality,
+            organization    => $organization,
+            orgUnit         => $orgUnit,
+            commonName      => $commonName,
+            },
+        issuer         => {
+            country         => $country,
+            state           => $state,
+            locality        => $locality,
+            organization    => $organization,
+            orgUnit         => $orgUnit,
+            commonName      => $commonName,
+            },
 
-    - key
+    where all values are just strings except these:
 
-        This should be name of file with private key file for server certificate
-        (file should be in PEM format).
+        $verified
+            Status of cetrificate RSA signature check:
+            -1  signature is wrong
+             1  signature is correct
+        $notBefore
+        $notAfter
+            Time period when certificate is active, in format
+            YYYYMMDDHHMMSSZ     (for ex.: 20061231235959Z)
 
-    - pass
+### stream
 
-        If file with private key is encrypted, you should provide password for
-        decrypting it in this parameter.
+    $stream = $plugin_ssl_client->stream();
+
+Returns IO::Stream object related to this plugin object.
+
+## IO::Stream::MatrixSSL::Server
+
+Same as above for IO::Stream::MatrixSSL::Client.
 
 # SUPPORT
 

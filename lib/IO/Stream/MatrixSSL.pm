@@ -15,7 +15,6 @@ use IO::Stream::MatrixSSL::Client;
 use IO::Stream::MatrixSSL::Server;
 
 
-# TODO update doc: {cb} params changed, ->stream() added
 sub stream {
     my ($self) = @_;
     my $stream = $self;
@@ -237,7 +236,8 @@ This document describes IO::Stream::MatrixSSL version v1.1.2
         ],
     });
     sub validate {
-        my ($certs, $ssl, $stream) = ($_[0], @{ $_[1] });
+        my ($ssl, $certs) = @_;
+        my $stream = $ssl->stream();
         # check cert, for ex.: $certs->[0]{subject}{commonName}
         return 0;
     }
@@ -249,25 +249,63 @@ This module is plugin for IO::Stream which allow you to use SSL (on both
 client and server streams).
 
 
-=head1 INTERFACE 
+=head1 INTERFACE
+
+=head2 IO::Stream::MatrixSSL::Client
+
+=head3 new
+
+    $plugin_ssl_client = IO::Stream::MatrixSSL::Client->new();
+
+    $plugin_ssl_client = IO::Stream::MatrixSSL::Client->new({
+        crt         => '/path/to/client.crt',
+        key         => '/path/to/client.key',
+        pass        => 's3cret',
+        trusted_CA  => '/path/to/ca-bundle.crt',
+        cb          => \&validate,
+    });
+
+Create and returns new IO::Stream plugin object.
 
 =over
 
-=item IO::Stream::MatrixSSL::Client->new(\%opt)
+=item crt
 
-Create and return new IO::Stream plugin object.
+=item key
 
-There two optional parameters:
+=item pass
 
-=over
+Authenticate client on server using client's certificate.
+(You'll need Crypt::MatrixSSL3 compiled with support for client authentication.)
+
+C<crt> and C<key> should contain file names of client's certificate and
+private key (in PEM format), C<pass> should contain password (as string)
+for private key.
+
+You can provide multiple file names with client's certificates in C<crt>
+separated by C<;>.
+
+All optional (C<crt> and C<key> should be either both provided or both omitted,
+C<pass> should be provided only if C<key> file protected by password).
+
+=item trusted_CA
+
+This should be name of file (or files) with allowed CA certificates,
+required to check RSA signature of server certificate. Crypt::MatrixSSL3
+provides such a file, so chances are you doesn't need to change default
+{trusted_CA} value (C<$Crypt::MatrixSSL3::CA_CERTIFICATES>) if you just
+wanna connect to public https servers.
+
+There may be many files listed in {trusted_CA}, separated by C<;>.
+Each file can contain many CA certificates.
 
 =item cb
 
-This should be CODE ref to your callback, which should check server
-certificate. Callback will be called with two parameters: HASH ref with
-certificate details, and ARRAY ref with two elements:
-IO::Stream::MatrixSSL::Client object and IO::Stream object (see L<SYNOPSIS>
-for example).
+This should be CODE ref to your callback, which will check server
+certificate. Callback will be called with two parameters:
+IO::Stream::MatrixSSL::Client (or IO::Stream::MatrixSSL::Server - if
+you're validating client's certificate) object and HASH ref with
+certificate details (see L</SYNOPSIS> for example).
 
 Callback should return a number >=0 if this certificate is acceptable,
 and we can continue with SSL handshake, or number <0 if this certificate
@@ -313,45 +351,18 @@ where all values are just strings except these:
         Time period when certificate is active, in format
         YYYYMMDDHHMMSSZ     (for ex.: 20061231235959Z)
 
-=item trusted_CA
-
-This should be name of file (or files) with allowed CA certificates,
-required to check RSA signature of server certificate. This module
-installed with such file, so chances are you doesn't need to change
-default {trusted_CA} value if you just wanna connect to https servers.
-
-There may be many files listed in {trusted_CA}, separated by ";".
-Each file can contain many CA certificates.
-
 =back
 
-=item IO::Stream::MatrixSSL::Server->new(\%opt)
+=head3 stream
 
-Create and return new IO::Stream plugin object.
+    $stream = $plugin_ssl_client->stream();
 
-There at least two required parameters: {crt} and {key}. If {key} is
-encrypted, then one more parameter required: {pass}.
+Returns IO::Stream object related to this plugin object.
 
-=over
 
-=item crt
+=head2 IO::Stream::MatrixSSL::Server
 
-This should be name of file (or files) with server certificate (or chain
-of certificates). See above {trusted_CA} about format of this parameter.
-
-=item key
-
-This should be name of file with private key file for server certificate
-(file should be in PEM format).
-
-=item pass
-
-If file with private key is encrypted, you should provide password for
-decrypting it in this parameter.
-
-=back
-
-=back
+Same as above for IO::Stream::MatrixSSL::Client.
 
 
 =head1 SUPPORT
