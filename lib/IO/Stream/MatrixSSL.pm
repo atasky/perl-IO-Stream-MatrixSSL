@@ -365,6 +365,31 @@ Returns IO::Stream object related to this plugin object.
 Same as above for IO::Stream::MatrixSSL::Client.
 
 
+=head1 MIGRATION
+
+MatrixSSL often makes incompatible API changes, and so does
+Crypt::MatrixSSL3. Sometimes because of this IO::Stream::MatrixSSL also
+change API in incompatible way, and below explained how to migrate your
+code.
+
+=head2 1.1.2 to 2.0.0
+
+Parameters for validation callback was changed:
+
+    sub validate {
+        ### WAS
+        my ($certs, $ssl, $stream) = ($_[0], @{ $_[1] });
+
+        ### NOW
+        my ($ssl, $certs) = @_;
+        my $stream = $ssl->stream();
+
+        ...
+    }
+
+Some error messages was changed too.
+
+
 =head1 SUPPORT
 
 =head2 Bugs / Feature Requests
