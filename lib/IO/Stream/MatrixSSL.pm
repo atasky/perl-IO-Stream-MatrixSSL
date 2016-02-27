@@ -45,18 +45,13 @@ sub WRITE {
         my $s = substr $m->{out_buf}, $m->{out_pos}||0;
         my $n = length $s;
 ENCODE:
-#say "# WRITE($self) {out_buf} len at enter = ", length $self->{out_buf};
         while (length $s) {
             my $s2 = substr $s, 0, SSL_MAX_PLAINTEXT_LEN, q{};
-#say "# WRITE($self) {out_buf} len in while = ", length $s;
             my $rc = $self->{_ssl}->encode_to_outdata($s2);
-#say "# WRITE($self) encode_to_outdata = ", get_ssl_error($rc);
             return $m->EVENT(0, 'ssl error: '.get_ssl_error($rc)) if $rc <= 0;
             while (my $rc_n = $self->{_ssl}->get_outdata($self->{out_buf})) {
-#say "# WRITE($self) get_outdata = ", $rc_n < 0 ? get_ssl_error($rc_n) : $rc_n;
                 return $m->EVENT(0, 'ssl error: '.get_ssl_error($rc_n)) if $rc_n < 0;
                 $rc = $self->{_ssl}->sent_data($rc_n);
-#say "# WRITE($self) sent_data = ", get_ssl_error($rc);
                 last if $rc == PS_SUCCESS;
                 next if $rc == MATRIXSSL_REQUEST_SEND;
                 next if $rc == MATRIXSSL_HANDSHAKE_COMPLETE;
@@ -75,11 +70,8 @@ ENCODE:
             $m->{out_buf} = q{};
         }
         $m->{out_bytes} += $n;
-#say "# WRITE($self) {out_buf} len at EVENT = ", length $self->{out_buf};
         $m->EVENT(OUT);
-#say "# WRITE($self) {out_buf} len at WRITE = ", length $self->{out_buf};
         $self->{_slave}->WRITE();
-#say "# WRITE($self) {out_buf} len at leave = ", length $self->{out_buf};
     }
     return;
 }
@@ -100,16 +92,12 @@ sub EVENT { ## no critic (ProhibitExcessComplexity)
         $e &= ~IN;
 RECV:
         my @warnings;
-#say "# EVENT($self)  {in_buf} len at enter = ", length $self->{in_buf};
         while (my $rc_n = $self->{_ssl}->get_readbuf($self->{in_buf})) {
-#say "# EVENT($self) get_readbuf = ", $rc_n < 0 ? get_ssl_error($rc_n) : $rc_n;
-#say "# EVENT($self)  {in_buf} len in while = ", length $self->{in_buf};
             if ($rc_n < 0) {
                 $err ||= 'ssl error: '.get_ssl_error($rc_n);
                 last;
             }
             my $rc = $self->{_ssl}->received_data($rc_n, my $buf);
-#say "# EVENT($self) received_data = ", get_ssl_error($rc);
 RC:
             last if $rc == PS_SUCCESS;
             next if $rc == MATRIXSSL_REQUEST_RECV;
@@ -145,23 +133,17 @@ RC:
                 last;
             }
             $rc = $self->{_ssl}->processed_data($buf);
-#say "# EVENT($self) processed_data = ", get_ssl_error($rc);
             goto RC;
         }
-#say "# EVENT($self)  {in_buf} len at leave = ", length $self->{in_buf};
         if (@warnings) {
             # XXX warning alert(s) may be lost if some other error or
             # fatal alert happens after warning alert(s).
             $err ||= join q{ }, 'ssl warning alert:', @warnings;
         }
 SEND:
-#say "# EVENT($self) {out_buf} len at enter = ", length $self->{out_buf};
         while (my $rc_n = $self->{_ssl}->get_outdata($self->{out_buf})) {
-#say "# EVENT($self) get_outdata = ", $rc_n < 0 ? get_ssl_error($rc_n) : $rc_n;
-#say "# EVENT($self) {out_buf} len in while = ", length $self->{out_buf};
             return $m->EVENT(0, 'ssl error: '.get_ssl_error($rc_n)) if $rc_n < 0;
             my $rc = $self->{_ssl}->sent_data($rc_n);
-#say "# EVENT($self) sent_data = ", get_ssl_error($rc);
             last if $rc == PS_SUCCESS;
             next if $rc == MATRIXSSL_REQUEST_SEND;
             if ($rc == MATRIXSSL_HANDSHAKE_COMPLETE) {
@@ -175,11 +157,9 @@ SEND:
             $err ||= 'ssl error: '.get_ssl_error($rc);
             last;
         }
-#say "# EVENT($self) {out_buf} len at WRITE = ", length $self->{out_buf};
         if (length $self->{out_buf}) {
             $self->{_slave}->WRITE();
         }
-#say "# EVENT($self) {out_buf} len at leave = ", length $self->{out_buf};
     }
     if ($e & RESOLVED) {
         $m->{ip} = $self->{ip};

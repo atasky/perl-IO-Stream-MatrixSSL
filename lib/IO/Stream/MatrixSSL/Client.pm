@@ -61,9 +61,7 @@ sub new {
     $self->{_ssl} = Crypt::MatrixSSL3::Client->new(
         $self->{_ssl_keys}, undef, undef, $cb, undef, undef, undef
     );
-#say "#   new($self) {out_buf} len at enter = ", length $self->{out_buf};
     my $rc_n = $self->{_ssl}->get_outdata($self->{out_buf});
-#say "#   new($self) {out_buf} len at leave = ", length $self->{out_buf};
     croak 'ssl error: '.get_ssl_error($rc_n) if $rc_n < 0;
     $rc = $self->{_ssl}->sent_data($rc_n);
     croak 'ssl error: '.get_ssl_error($rc) if $rc != PS_SUCCESS;
@@ -76,9 +74,7 @@ sub PREPARE {
         $self->{_t} = EV::timer(TOHANDSHAKE, 0, $self->{_cb_t});
     }
     $self->{_slave}->PREPARE($fh, $host, $port);
-#say "# PREPR($self) {out_buf} len at enter = ", length $self->{out_buf};
     $self->{_slave}->WRITE();                       # output 'client hello'
-#say "# PREPR($self) {out_buf} len at leave = ", length $self->{out_buf};
     return;
 }
 
