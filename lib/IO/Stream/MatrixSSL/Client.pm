@@ -60,9 +60,7 @@ sub new {
     $self->{_ssl} = Crypt::MatrixSSL3::Client->new(
         $self->{_ssl_keys}, undef, undef, $cb, undef, undef, undef
     );
-    my $rc_n = $self->{_ssl}->get_outdata($self->{out_buf});
-    croak 'ssl error: '.get_ssl_error($rc_n) if $rc_n < 0;
-    $rc = $self->{_ssl}->sent_data($rc_n);
+    $rc = $self->{_ssl}->sent_data( $self->{_ssl}->get_outdata($self->{out_buf}) );
     croak 'ssl error: '.get_ssl_error($rc) if $rc != PS_SUCCESS;
     return $self;
 }

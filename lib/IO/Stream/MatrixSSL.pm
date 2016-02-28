@@ -48,9 +48,8 @@ ENCODE:
             my $s2 = substr $s, 0, SSL_MAX_PLAINTEXT_LEN, q{};
             my $rc = $self->{_ssl}->encode_to_outdata($s2);
             return $m->EVENT(0, 'ssl error: '.get_ssl_error($rc)) if $rc <= 0;
-            while (my $rc_n = $self->{_ssl}->get_outdata($self->{out_buf})) {
-                return $m->EVENT(0, 'ssl error: '.get_ssl_error($rc_n)) if $rc_n < 0;
-                $rc = $self->{_ssl}->sent_data($rc_n);
+            while (my $bytes = $self->{_ssl}->get_outdata($self->{out_buf})) {
+                $rc = $self->{_ssl}->sent_data($bytes);
                 last if $rc == PS_SUCCESS;
                 next if $rc == MATRIXSSL_REQUEST_SEND;
                 next if $rc == MATRIXSSL_HANDSHAKE_COMPLETE;
@@ -91,12 +90,8 @@ sub EVENT { ## no critic (ProhibitExcessComplexity)
         $e &= ~IN;
 RECV:
         my @warnings;
-        while (my $rc_n = $self->{_ssl}->get_readbuf($self->{in_buf})) {
-            if ($rc_n < 0) {
-                $err ||= 'ssl error: '.get_ssl_error($rc_n);
-                last;
-            }
-            my $rc = $self->{_ssl}->received_data($rc_n, my $buf);
+        while (length $self->{in_buf}) {
+            my $rc = $self->{_ssl}->received_data($self->{in_buf}, my $buf);
 RC:
             last if $rc == PS_SUCCESS;
             next if $rc == MATRIXSSL_REQUEST_RECV;
@@ -140,9 +135,8 @@ RC:
             $err ||= join q{ }, 'ssl warning alert:', @warnings;
         }
 SEND:
-        while (my $rc_n = $self->{_ssl}->get_outdata($self->{out_buf})) {
-            return $m->EVENT(0, 'ssl error: '.get_ssl_error($rc_n)) if $rc_n < 0;
-            my $rc = $self->{_ssl}->sent_data($rc_n);
+        while (my $bytes = $self->{_ssl}->get_outdata($self->{out_buf})) {
+            my $rc = $self->{_ssl}->sent_data($bytes);
             last if $rc == PS_SUCCESS;
             next if $rc == MATRIXSSL_REQUEST_SEND;
             if ($rc == MATRIXSSL_HANDSHAKE_COMPLETE) {

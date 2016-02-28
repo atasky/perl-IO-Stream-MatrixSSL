@@ -2,6 +2,11 @@ Revision history for IO-Stream-MatrixSSL
 
 {{$NEXT}}
 	- Switch to Dist::Milla.
+	- Update for Crypt::MatrixSSL3-3.7.4.
+
+	[INCOMPATIBLE API CHANGE]
+	- Validation callback params was changed,
+	  see MIGRATION section in doc for details.
 
 1.1.2   2013-10-03 16:52:03 EEST
 	- Remove MYMETA.*
