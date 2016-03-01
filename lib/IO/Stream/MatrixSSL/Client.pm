@@ -5,7 +5,7 @@ use strict;
 use utf8;
 use Carp;
 
-our $VERSION = 'v1.1.2';
+our $VERSION = 'v2.0.0';
 
 use IO::Stream::const;
 use IO::Stream::MatrixSSL::const;

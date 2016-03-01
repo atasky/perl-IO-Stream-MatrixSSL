@@ -5,7 +5,7 @@ use strict;
 use utf8;
 use Carp;
 
-our $VERSION = 'v1.1.2';
+our $VERSION = 'v2.0.0';
 
 use IO::Stream::const;
 use IO::Stream::MatrixSSL::const;
@@ -197,7 +197,7 @@ IO::Stream::MatrixSSL - Crypt::MatrixSSL plugin for IO::Stream
 
 =head1 VERSION
 
-This document describes IO::Stream::MatrixSSL version v1.1.2
+This document describes IO::Stream::MatrixSSL version v2.0.0
 
 
 =head1 SYNOPSIS

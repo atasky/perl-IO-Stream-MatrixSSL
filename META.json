@@ -60,19 +60,19 @@
    "provides" : {
       "IO::Stream::MatrixSSL" : {
          "file" : "lib/IO/Stream/MatrixSSL.pm",
-         "version" : "v1.1.2"
+         "version" : "v2.0.0"
       },
       "IO::Stream::MatrixSSL::Client" : {
          "file" : "lib/IO/Stream/MatrixSSL/Client.pm",
-         "version" : "v1.1.2"
+         "version" : "v2.0.0"
       },
       "IO::Stream::MatrixSSL::Server" : {
          "file" : "lib/IO/Stream/MatrixSSL/Server.pm",
-         "version" : "v1.1.2"
+         "version" : "v2.0.0"
       },
       "IO::Stream::MatrixSSL::const" : {
          "file" : "lib/IO/Stream/MatrixSSL/const.pm",
-         "version" : "v1.1.2"
+         "version" : "v2.0.0"
       }
    },
    "release_status" : "stable",
@@ -87,6 +87,6 @@
          "web" : "https://github.com/powerman/perl-IO-Stream-MatrixSSL"
       }
    },
-   "version" : "v1.1.2"
+   "version" : "v2.0.0"
 }
 
