@@ -39,7 +39,7 @@
       },
       "runtime" : {
          "requires" : {
-            "Crypt::MatrixSSL3" : "v3.7.3",
+            "Crypt::MatrixSSL3" : "v3.7.4",
             "IO::Stream" : "0",
             "IO::Stream::const" : "0",
             "Scalar::Util" : "0",

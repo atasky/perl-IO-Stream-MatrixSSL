@@ -1,6 +1,6 @@
 requires 'perl', '5.010001';
 
-requires 'Crypt::MatrixSSL3', 'v3.7.3';
+requires 'Crypt::MatrixSSL3', 'v3.7.4';
 requires 'IO::Stream';
 requires 'IO::Stream::const';
 requires 'Scalar::Util';
