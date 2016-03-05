@@ -7,7 +7,7 @@ IO::Stream::MatrixSSL - Crypt::MatrixSSL plugin for IO::Stream
 
 # VERSION
 
-This document describes IO::Stream::MatrixSSL version v2.0.0
+This document describes IO::Stream::MatrixSSL version v2.0.1
 
 # SYNOPSIS
 

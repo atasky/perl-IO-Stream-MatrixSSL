@@ -1,6 +1,8 @@
 Revision history for IO-Stream-MatrixSSL
 
 {{$NEXT}}
+
+v2.0.1  2016-03-05 02:17:24 EET
 	- Fix tests portability.
 
 v2.0.0  2016-03-01 12:46:25 EET
