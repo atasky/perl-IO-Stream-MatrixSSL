@@ -1,6 +1,7 @@
 Revision history for IO-Stream-MatrixSSL
 
 {{$NEXT}}
+	- Fix tests portability.
 
 v2.0.0  2016-03-01 12:46:25 EET
 	- Switch to Dist::Milla.

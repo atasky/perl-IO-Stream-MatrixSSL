@@ -42,7 +42,7 @@ sub create_server_stream {
 
 sub leaktest {
     my $test = shift;
-    my %arg  = (init=>10, test=>1000, max_mem_diff=>256, diag=>0, @_);
+    my %arg  = (init=>10, test=>1000, max_mem_diff=>(WIN32?512:288), diag=>0, @_);
     my $tmp = 'x' x 1000000; undef $tmp;
     my $code = sub { no strict 'refs'; \&$test(); };
     $code->() for 1 .. $arg{init};
