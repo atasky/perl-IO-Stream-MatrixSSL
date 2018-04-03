@@ -2,6 +2,9 @@ Revision history for IO-Stream-MatrixSSL
 
 {{$NEXT}}
 
+v2.0.2  2018-04-03 19:45:54 EEST
+	- Fix compatibility with perl-5.26.
+
 v2.0.1  2016-03-05 02:17:24 EET
 	- Fix tests portability.
 
